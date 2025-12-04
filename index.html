@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多人同步記帳系統</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; }
+        input, button { padding: 10px; font-size: 1em; margin: 5px 0; }
+        ul { list-style-type: none; padding: 0; }
+        li { background: #f9f9f9; border-bottom: 1px solid #ddd; padding: 10px; display: flex; justify-content: space-between; }
+        .amount { font-weight: bold; color: green; }
+    </style>
+</head>
+<body>
+
+    <h2>💰 共用記帳本 (Firebase同步版)</h2>
+    
+    <div>
+        <input type="text" id="itemInput" placeholder="項目 (例如: 晚餐)">
+        <input type="number" id="priceInput" placeholder="金額">
+        <button onclick="addData()">新增紀錄</button>
+    </div>
+
+    <ul id="accountingList">
+        <li>讀取資料中...</li>
+    </ul>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        // 2. 把你申請的配置貼在這裡 (一定要換成你自己的!)
+        const firebaseConfig = {
+    apiKey: "AIzaSyAyebCTYX0SdZbO_wTKVjMyQXmGsnmSkzs",
+    authDomain: "travel-30c43.firebaseapp.com",
+    databaseURL: "https://travel-30c43-default-rtdb.firebaseio.com",
+    projectId: "travel-30c43",
+    storageBucket: "travel-30c43.firebasestorage.app",
+    messagingSenderId: "402035619902",
+    appId: "1:402035619902:web:f492adf217821c093f396f",
+    measurementId: "G-SPF452S4LR"
+  };
+
+        // 初始化 Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const dbRef = ref(db, 'records'); // 建立一個叫做 records 的資料夾
+
+        // --- 功能 A: 新增資料 ---
+        window.addData = function() {
+            const item = document.getElementById('itemInput').value;
+            const price = document.getElementById('priceInput').value;
+
+            if(item && price) {
+                // 將資料推送到 Firebase
+                push(dbRef, {
+                    item: item,
+                    price: price,
+                    timestamp: Date.now()
+                });
+                
+                // 清空輸入框
+                document.getElementById('itemInput').value = '';
+                document.getElementById('priceInput').value = '';
+            } else {
+                alert("請輸入項目和金額");
+            }
+        }
+
+        // --- 功能 B: 即時監聽資料 (同步的核心) ---
+        // onValue 會在資料庫有任何變動時，自動觸發
+        onValue(dbRef, (snapshot) => {
+            const listElement = document.getElementById('accountingList');
+            listElement.innerHTML = ""; // 先清空清單
+
+            const data = snapshot.val();
+            
+            if (data) {
+                // 把資料庫回傳的物件轉成陣列並顯示
+                Object.keys(data).forEach(key => {
+                    const record = data[key];
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        <span>${record.item}</span>
+                        <span class="amount">$${record.price}</span>
+                        <button onclick="deleteData('${key}')" style="margin-left:10px; color:red; font-size:0.8em;">刪除</button>
+                    `;
+                    listElement.appendChild(li);
+                });
+            } else {
+                listElement.innerHTML = "<li>目前沒有紀錄</li>";
+            }
+        });
+
+        // --- 功能 C: 刪除資料 ---
+        // 為了讓 window 可以呼叫模組內的函數，需掛載到 window 上
+        window.deleteData = function(key) {
+            if(confirm('確定要刪除這筆資料嗎？')) {
+                const itemRef = ref(db, 'records/' + key);
+                remove(itemRef);
+            }
+        }
+    </script>
+</body>
+</html>
